@@ -58,6 +58,18 @@ npm start
 npm test
 ```
 
+### API Mode
+```
+npm run dev     # Start API server
+npm start       # Start built API server
+```
+
+### MCP Mode
+```
+npm run dev:mcp   # Start MCP server in dev
+npm run start:mcp # Start built MCP server
+```
+
 ## How to Use
 
 Add this server to your MCP client configuration. The server provides the following tools:
@@ -67,6 +79,38 @@ Add this server to your MCP client configuration. The server provides the follow
 - `delete_email` - Delete an email by ID
 - `get_latest_email` - Get the most recent email
 
+## API Usage
+
+### 1. Register User
+```bash
+POST /api/register
+{
+  "username": "user1",
+  "password": "password123",
+  "emailConfig": {
+    "host": "smtp.gmail.com",
+    "port": 587,
+    "user": "your-email@gmail.com",
+    "pass": "your-app-password",
+    "from": "your-email@gmail.com"
+  }
+}
+```
+
+### 2. Use Mail API
+```bash
+POST /api/mail
+{
+  "token": "your-token",
+  "action": "send",
+  "to": "recipient@example.com",
+  "subject": "Test Subject",
+  "body": "Test message"
+}
+```
+
+Actions: `send`, `get`, `delete`, `latest`
+
 ## MCP Configuration
 
 Add this to your MCP client configuration file:
@@ -75,8 +119,8 @@ Add this to your MCP client configuration file:
 {
   "mcpServers": {
     "mail-server": {
-      "command": "npx",
-      "args": ["tsx", "/mnt/c/Users/Olsen/Desktop/mail-mcp-server/dist/index.js"],
+      "command": "node",
+      "args": ["dist/index.js", "--mcp"],
       "env": {
         "EMAIL_HOST": "smtp.gmail.com",
         "EMAIL_PORT": "587",

@@ -5,6 +5,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import * as emailService from "./services/emailService.js";
+import app from "./app.js";
 
 const server = new Server(
   {
@@ -125,8 +126,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  if (process.argv.includes('--mcp')) {
+    // MCP mode
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+  } else {
+    // API mode
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+      console.log(`API server running on port ${PORT}`);
+    });
+  }
 }
 
 main().catch(console.error);

@@ -1,0 +1,51 @@
+# Register User
+curl -X POST http://localhost:3000/api/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "bangarraju",
+    "password": "bangarraju",
+    "emailConfig": {
+      "host": "smtp.gmail.com",
+      "port": 587,
+      "user": "bangarraju1152@gmail.com",
+      "pass": "fqwbsharjnrxxkod",
+      "from": "bangarraju1152@gmail.com"
+    }
+  }'
+
+# Send Email
+curl -X POST http://localhost:3000/api/mail \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "MTc1NTg4Mzg2NDE4Mi0xNzU1ODgzODY0MTg2",
+    "action": "send",
+    "to": "hackmet321@gmail.com",
+    "subject": "Test Email",
+    "body": "Hello from API"
+  }'
+
+# Get Emails
+curl -X POST http://localhost:3000/api/mail \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "MTc1NTg4MzMyNDQzMS0xNzU1ODgzMzI0NDUw",
+    "action": "get",
+    "limit": 10
+  }'
+
+# Delete Email
+curl -X POST http://localhost:3000/api/mail \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "MTc1NTg4MzMyNDQzMS0xNzU1ODgzMzI0NDUw",
+    "action": "delete",
+    "emailId": "bangarraju1152@gmail.com"
+  }'
+
+# Get Latest Email
+curl -X POST http://localhost:3000/api/mail \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "MTc1NTg4MzMyNDQzMS0xNzU1ODgzMzI0NDUw",
+    "action": "latest"
+  }'
