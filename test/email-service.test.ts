@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterAll, afterEach } from 'vitest';
+import fs from 'fs';
+import path from 'path';
 import * as emailService from '../src/services/emailService.js';
 import type { Attachment } from '../src/services/emailService.js';
 
@@ -224,6 +226,104 @@ describe('Email Service', () => {
 
       // Restore default for other tests
       emailService.setMaxEmails(500);
+    });
+  });
+
+  // ── File Path Attachments (streaming) ────────────────────
+
+  describe('File path attachments (streaming)', () => {
+    const tmpDir = path.resolve('test-tmp');
+    const smallFile = path.join(tmpDir, 'hello.txt');
+    const largeContent = 'x'.repeat(1024 * 1024 * 5); // 5MB test content
+    const largeFile = path.join(tmpDir, 'large-5mb.bin');
+    const pngFile = path.join(tmpDir, 'photo.png');
+
+    beforeEach(() => {
+      fs.mkdirSync(tmpDir, { recursive: true });
+      fs.writeFileSync(smallFile, 'Hello from streaming file!', 'utf-8');
+      fs.writeFileSync(largeFile, largeContent, 'utf-8');
+      // Copy from existing base64 test data to a real file
+      const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      fs.writeFileSync(pngFile, Buffer.from(pngBase64, 'base64'));
+    });
+
+    afterEach(() => {
+      // Clean up temp files
+      try { fs.unlinkSync(smallFile); } catch { /* ok */ }
+      try { fs.unlinkSync(largeFile); } catch { /* ok */ }
+      try { fs.unlinkSync(pngFile); } catch { /* ok */ }
+      try { fs.rmdirSync(tmpDir); } catch { /* ok */ }
+    });
+
+    it('should send an email with a file path attachment (streamed)', async () => {
+      const email = await emailService.sendEmail(
+        'test@example.com', 'Streaming file', 'Body',
+        undefined, undefined, undefined, undefined, undefined,
+        [{ filePath: smallFile }],
+      );
+
+      expect(email.fileAttachments).toBeDefined();
+      expect(email.fileAttachments).toHaveLength(1);
+      expect(email.fileAttachments![0].filePath).toBe(smallFile);
+    });
+
+    it('should accept custom filename override', async () => {
+      const email = await emailService.sendEmail(
+        'a@b.com', 'Custom name', 'Body',
+        undefined, undefined, undefined, undefined, undefined,
+        [{ filePath: smallFile, filename: 'renamed.txt' }],
+      );
+
+      expect(email.fileAttachments![0].filename).toBe('renamed.txt');
+    });
+
+    it('should send a large file (5MB) without issues', async () => {
+      const email = await emailService.sendEmail(
+        'a@b.com', 'Large file', 'Body',
+        undefined, undefined, undefined, undefined, undefined,
+        [{ filePath: largeFile, filename: 'large.bin' }],
+      );
+
+      expect(email.fileAttachments).toHaveLength(1);
+      expect(email.fileAttachments![0].filePath).toBe(largeFile);
+    });
+
+    it('should support both base64 and file path attachments together', async () => {
+      const textAttachment: Attachment = {
+        filename: 'hello.txt',
+        content: Buffer.from('Hello, World!').toString('base64'),
+        contentType: 'text/plain',
+      };
+
+      const email = await emailService.sendEmail(
+        'a@b.com', 'Mixed attachments', 'Body',
+        [textAttachment], undefined, undefined, undefined, undefined,
+        [{ filePath: pngFile }],
+      );
+
+      expect(email.attachments).toHaveLength(1);
+      expect(email.fileAttachments).toHaveLength(1);
+    });
+
+    it('should throw if file path does not exist', async () => {
+      await expect(emailService.sendEmail(
+        'a@b.com', 'Missing file', 'Body',
+        undefined, undefined, undefined, undefined, undefined,
+        [{ filePath: '/nonexistent/file.pdf' }],
+      )).rejects.toThrow('File not found');
+    });
+
+    it('should store fileAttachment metadata in email history', async () => {
+      await emailService.sendEmail(
+        'a@b.com', 'Store test', 'Body',
+        undefined, undefined, undefined, undefined, undefined,
+        [{ filePath: smallFile }],
+      );
+
+      const stored = emailService.getLatestEmail();
+      expect(stored?.fileAttachments).toBeDefined();
+      expect(stored?.fileAttachments).toHaveLength(1);
+      expect(stored?.fileAttachments![0].filePath).toBe(smallFile);
     });
   });
 });

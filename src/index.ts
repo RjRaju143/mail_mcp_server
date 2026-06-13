@@ -5,7 +5,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import * as emailService from "./services/emailService.js";
-import type { Attachment } from "./services/emailService.js";
+import type { Attachment, FileAttachment } from "./services/emailService.js";
 
 const server = new Server(
   {
@@ -46,6 +46,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                   contentType: { type: "string", description: "MIME type (optional, inferred from filename if omitted)" },
                 },
                 required: ["filename", "content"],
+              },
+            },
+            filePaths: {
+              type: "array",
+              description: "Optional file paths on disk — streamed directly (no size limit, supports any file size)",
+              items: {
+                type: "object",
+                properties: {
+                  filePath: { type: "string", description: "Absolute or relative path to the file on disk" },
+                  filename: { type: "string", description: "Optional override filename in the email (defaults to basename)" },
+                },
+                required: ["filePath"],
               },
             },
           },
@@ -110,12 +122,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         args?.cc as string | undefined,
         args?.bcc as string | undefined,
         args?.replyTo as string | undefined,
+        args?.filePaths as FileAttachment[] | undefined,
       );
+      const attachCount = (email.attachments?.length ?? 0) + (email.fileAttachments?.length ?? 0);
       return {
         content: [
           {
             type: "text",
-            text: `Email sent successfully. ID: ${email.id}${email.attachments && email.attachments.length > 0 ? ` with ${email.attachments.length} attachment(s)` : ''}`,
+            text: `Email sent successfully. ID: ${email.id}${attachCount > 0 ? ` with ${attachCount} attachment(s)` : ''}`,
           },
         ],
       };

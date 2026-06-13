@@ -1,4 +1,6 @@
 import nodemailer from 'nodemailer';
+import fs from 'fs';
+import path from 'path';
 import { emailConfig, fromAddress } from '../config/email.js';
 
 // ── Validation ──────────────────────────────────────────────
@@ -29,6 +31,13 @@ export interface Attachment {
   contentType?: string;
 }
 
+export interface FileAttachment {
+  /** Path to file on disk — streamed directly (no size limit). */
+  filePath: string;
+  /** Optional override filename (defaults to basename of filePath). */
+  filename?: string;
+}
+
 export interface Email {
   id: string;
   to: string;
@@ -37,6 +46,7 @@ export interface Email {
   body: string;
   timestamp: string;
   attachments?: Attachment[];
+  fileAttachments?: FileAttachment[];
   html?: string;
   cc?: string;
   bcc?: string;
@@ -80,6 +90,7 @@ export const sendEmail = async (
   cc?: string,
   bcc?: string,
   replyTo?: string,
+  filePaths?: FileAttachment[],
 ) => {
   validateEmailFields(to, cc, bcc);
 
@@ -91,19 +102,43 @@ export const sendEmail = async (
     body,
     timestamp: new Date().toISOString(),
     ...(attachments && attachments.length > 0 ? { attachments } : {}),
+    ...(filePaths && filePaths.length > 0 ? { fileAttachments: filePaths } : {}),
     ...(html ? { html } : {}),
     ...(cc ? { cc } : {}),
     ...(bcc ? { bcc } : {}),
     ...(replyTo ? { replyTo } : {}),
   };
 
+  // Validate file paths exist before sending (throws immediately, not caught below)
+  if (filePaths && filePaths.length > 0) {
+    for (const fp of filePaths) {
+      const resolvedPath = path.resolve(fp.filePath);
+      if (!fs.existsSync(resolvedPath)) {
+        throw new Error(`File not found: ${resolvedPath}`);
+      }
+    }
+  }
+
   try {
-    const mailAttachments = attachments?.map(att => ({
+    // Build base64 attachments
+    const mailAttachments: any[] = attachments?.map(att => ({
       filename: att.filename,
       content: att.content,
       encoding: 'base64' as const,
       ...(att.contentType ? { contentType: att.contentType } : {}),
-    }));
+    })) ?? [];
+
+    // Build file-path attachments — streamed directly (no buffer)
+    // Paths already validated above; paths are guaranteed to exist.
+    if (filePaths && filePaths.length > 0) {
+      for (const fp of filePaths) {
+        const resolvedPath = path.resolve(fp.filePath);
+        mailAttachments.push({
+          filename: fp.filename || path.basename(resolvedPath),
+          content: fs.createReadStream(resolvedPath), // ← streams to SMTP
+        });
+      }
+    }
 
     const mailOptions: any = {
       from: fromAddress,
@@ -114,7 +149,7 @@ export const sendEmail = async (
       ...(replyTo ? { replyTo } : {}),
       text: body,
       ...(html ? { html } : {}),
-      ...(mailAttachments && mailAttachments.length > 0 ? { attachments: mailAttachments } : {}),
+      ...(mailAttachments.length > 0 ? { attachments: mailAttachments } : {}),
     };
 
     await (transporter as any).sendMail(mailOptions);
