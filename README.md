@@ -76,7 +76,7 @@ Add this to your MCP client configuration file:
   "mcpServers": {
     "mail-server": {
       "command": "npx",
-      "args": ["tsx", "/mnt/c/Users/Olsen/Desktop/mail-mcp-server/dist/index.js"],
+      "args": ["tsx", "/path/to/mail-mcp-server/dist/index.js"],
       "env": {
         "EMAIL_HOST": "smtp.gmail.com",
         "EMAIL_PORT": "587",

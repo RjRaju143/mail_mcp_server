@@ -5,6 +5,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import * as emailService from "./services/emailService.js";
+import type { Attachment } from "./services/emailService.js";
 
 const server = new Server(
   {
@@ -23,13 +24,30 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "send_email",
-        description: "Send an email",
+        description: "Send an email with optional attachments, HTML body, CC/BCC/Reply-To",
         inputSchema: {
           type: "object",
           properties: {
             to: { type: "string", description: "Recipient email address" },
             subject: { type: "string", description: "Email subject" },
-            body: { type: "string", description: "Email body content" },
+            body: { type: "string", description: "Plain text email body (fallback when html is provided)" },
+            html: { type: "string", description: "Optional HTML email body" },
+            cc: { type: "string", description: "Optional CC recipient email address" },
+            bcc: { type: "string", description: "Optional BCC recipient email address" },
+            replyTo: { type: "string", description: "Optional Reply-To email address" },
+            attachments: {
+              type: "array",
+              description: "Optional file attachments (base64-encoded content)",
+              items: {
+                type: "object",
+                properties: {
+                  filename: { type: "string", description: "File name with extension" },
+                  content: { type: "string", description: "Base64-encoded file content" },
+                  contentType: { type: "string", description: "MIME type (optional, inferred from filename if omitted)" },
+                },
+                required: ["filename", "content"],
+              },
+            },
           },
           required: ["to", "subject", "body"],
         },
@@ -63,6 +81,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {},
         },
       },
+      {
+        name: "get_email_by_id",
+        description: "Get a single email by its ID",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Email ID to retrieve" },
+          },
+          required: ["id"],
+        },
+      },
     ],
   };
 });
@@ -75,13 +104,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const email = await emailService.sendEmail(
         args?.to as string,
         args?.subject as string,
-        args?.body as string
+        args?.body as string,
+        args?.attachments as Attachment[] | undefined,
+        args?.html as string | undefined,
+        args?.cc as string | undefined,
+        args?.bcc as string | undefined,
+        args?.replyTo as string | undefined,
       );
       return {
         content: [
           {
             type: "text",
-            text: `Email sent successfully. ID: ${email.id}`,
+            text: `Email sent successfully. ID: ${email.id}${email.attachments && email.attachments.length > 0 ? ` with ${email.attachments.length} attachment(s)` : ''}`,
           },
         ],
       };
@@ -115,6 +149,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           {
             type: "text",
             text: latestEmail ? JSON.stringify(latestEmail, null, 2) : "No emails found",
+          },
+        ],
+      };
+
+    case "get_email_by_id":
+      const foundEmail = emailService.getEmailById(args?.id as string);
+      return {
+        content: [
+          {
+            type: "text",
+            text: foundEmail ? JSON.stringify(foundEmail, null, 2) : `Email ${args?.id} not found`,
           },
         ],
       };
